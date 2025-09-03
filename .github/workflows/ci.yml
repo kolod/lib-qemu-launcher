@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+      - dev
+  workflow_dispatch:
+  
+jobs:
+  build-and-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Update package lists
+        if: runner.os == 'Linux'
+        run: sudo apt-get update
+
+      - name: Remove existing CMake
+        if: runner.os == 'Linux'
+        run: sudo apt-get remove -y cmake
+
+      - name: Setup CMake 3.31+
+        uses: jwlawson/actions-setup-cmake@v1
+        with:
+          cmake-version: '>=3.31.0'
+
+      - name: Install GCC (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y build-essential
+
+      - name: Install GCC (macOS)
+        if: runner.os == 'macOS'
+        run: brew install gcc
+
+      - name: Install GCC (Windows)
+        if: runner.os == 'Windows'
+        run: choco install gcc
+
+      - name: Install Ninja (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y ninja-build
+
+      - name: Install Ninja (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ninja
+
+      - name: Install Ninja (Windows)
+        if: runner.os == 'Windows'
+        run: choco install ninja
+
+      - name: Print Versions
+        run: |
+          cmake --version
+          ninja --version
+          gcc --version
+
+      - name: Configure (Linux/macOS)
+        run: cmake --preset gcc-debug
+
+      - name: Build
+        run: cmake --build --preset gcc-debug --parallel
+
+      - name: Publish build artifacts if failed
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts-${{ github.run_id }}
+          path: build/gcc-debug/
+
+      - name: Test
+        env:
+          CTEST_OUTPUT_ON_FAILURE: '1'
+        run: ctest --preset gcc-debug -V
