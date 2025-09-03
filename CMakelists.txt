@@ -1,0 +1,21 @@
+cmake_minimum_required(VERSION 3.31.0)
+project(lib-qemu-launcher VERSION 0.1.0 LANGUAGES C CXX)
+include(GNUInstallDirs)
+
+# Options
+option(BUILD_SHARED_LIBS "Build shared libraries" ON)
+option(BUILD_TESTING "Build testing" OFF)
+option(BUILD_EXAMPLES "Build examples" OFF)
+
+# Add the src directory
+add_subdirectory(src)
+
+# Add the examples directory
+if(BUILD_EXAMPLES)
+    add_subdirectory(examples)
+endif()
+
+# Add the tests directory
+if(BUILD_TESTING)
+    add_subdirectory(tests)
+endif()

@@ -1,0 +1,72 @@
+{
+    "$schema": "https://raw.githubusercontent.com/Kitware/CMake/refs/heads/master/Help/manual/presets/schema.json",
+    "version": 10,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 31,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "gcc-debug",
+            "displayName": "Configure GCC Debug",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "installDir": "${sourceDir}/install/${presetName}",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_C_COMPILER": "gcc",
+                "CMAKE_CXX_COMPILER": "g++",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "YES",
+                "BUILD_SHARED_LIBS": "YES",
+                "BUILD_TESTING": "YES",
+                "BUILD_EXAMPLES": "YES"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "gcc-debug",
+            "displayName": "Build GCC Debug",
+            "configurePreset": "gcc-debug",
+            "cleanFirst": true,
+            "verbose": true
+        },
+        {
+            "name": "gcc-debug-install",
+            "displayName": "Install GCC Debug",
+            "configurePreset": "gcc-debug"
+        }
+    ],
+    "testPresets": [
+        {
+            "name": "gcc-debug",
+            "displayName": "Test GCC Debug",
+            "configurePreset": "gcc-debug"
+        }
+    ],
+    "workflowPresets": [
+        {
+            "name": "gcc-debug",
+            "displayName": "GCC Debug Workflow",
+            "steps": [
+                {
+                    "name": "gcc-debug",
+                    "type": "configure"
+                },
+                {
+                    "name": "gcc-debug",
+                    "type": "build"
+                },
+                {
+                    "name": "gcc-debug",
+                    "type": "test"
+                },
+                {
+                    "name": "gcc-debug-install",
+                    "type": "build"
+                }
+            ]
+        }
+    ]
+}
