@@ -42,9 +42,12 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install gcc
 
-      - name: Install GCC (Windows)
+      - name: Install MinGW-w64 (Windows)
         if: runner.os == 'Windows'
-        run: choco install gcc
+        run: |
+          choco install mingw -y --no-progress
+          echo "C:\tools\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          g++ --version
 
       - name: Install Ninja (Linux)
         if: runner.os == 'Linux'
@@ -58,11 +61,18 @@ jobs:
         if: runner.os == 'Windows'
         run: choco install ninja
 
-      - name: Print Versions
+      - name: Show directory contents (Linux/macOS)
+        if: runner.os == 'Linux' || runner.os == 'macOS'
         run: |
-          cmake --version
-          ninja --version
-          gcc --version
+          ls -R .
+
+      - name: Show directory contents (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          dir /s
+
+      - name: List CMake Presets
+        run: cmake --list-presets
 
       - name: Configure (Linux/macOS)
         run: cmake --preset gcc-debug
