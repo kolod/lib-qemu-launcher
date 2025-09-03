@@ -12,7 +12,7 @@ else()
 endif()
 
 # Create the qemu_launcher library
-add_library(qemu_launcher ${SOURCES})
+add_library(qemu_launcher STATIC ${SOURCES})
 
 # Set include directories
 target_include_directories(qemu_launcher PUBLIC ${CMAKE_SOURCE_DIR}/include)

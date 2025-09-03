@@ -5,7 +5,3 @@
 
 #include <gtest/gtest.h>
 #include <qemu/launcher.h>
-
-TEST(QemuLauncherTest, Test1) {
-    EXPECT_EQ(1, 1);
-}

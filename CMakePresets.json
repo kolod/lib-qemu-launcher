@@ -28,9 +28,7 @@
         {
             "name": "gcc-debug",
             "displayName": "Build GCC Debug",
-            "configurePreset": "gcc-debug",
-            "cleanFirst": true,
-            "verbose": true
+            "configurePreset": "gcc-debug"
         },
         {
             "name": "gcc-debug-install",

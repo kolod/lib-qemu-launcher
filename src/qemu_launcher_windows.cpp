@@ -89,29 +89,28 @@ namespace qemu {
 
     // Find the QEMU executable in the QEMU_ROOT environment variable
     std::unique_ptr<wchar_t[]> findQemuExecutableEnv(const std::string& system) {
-        DWORD size = GetEnvironmentVariableW(L"QEMU_ROOT", nullptr, 0);
+        auto size = GetEnvironmentVariableW(L"QEMU_ROOT", nullptr, 0);
         if (size == 0) return nullptr;
 
-        auto qemu_root_path = new wchar_t[size];
-        auto written = GetEnvironmentVariableW(L"QEMU_ROOT", qemu_root_path, size);
+        auto qemu_root_path = std::make_unique<wchar_t[]>(size);
+        auto written = GetEnvironmentVariableW(L"QEMU_ROOT", qemu_root_path.get(), size);
         if ((written > 0) && (written < size)) {
-            auto path = getExePathIfExists(qemu_root_path, system);
+            auto path = getExePathIfExists(qemu_root_path.get(), system);
             if (path) return path;
         }
 
-        delete[] qemu_root_path;
         return nullptr;
     }
 
     // Find the QEMU executable in the system PATH
     std::unique_ptr<wchar_t[]> findQemuExecutablePath(const std::string& system) {
-        DWORD size = GetEnvironmentVariableW(L"PATH", nullptr, 0);
+        auto size = GetEnvironmentVariableW(L"PATH", nullptr, 0);
         if (size == 0) return nullptr;
 
         auto path_env = std::make_unique<wchar_t[]>(size);
         auto written = GetEnvironmentVariableW(L"PATH", path_env.get(), size);
         if ((written > 0) && (written < size)) {
-            wchar_t* current_path = path_env.get();
+            auto current_path = path_env.get();
             for (size_t i = 0; i < size; i++) {
                 if (path_env[i] == L';' || path_env[i] == L'\0') {
                     path_env[i] = L'\0';
@@ -127,6 +126,31 @@ namespace qemu {
         return nullptr;
     }
 
+    // Find the QEMU executable by HKLM\SOFTWARE\QEMU\Install_Dir registry key
+    std::unique_ptr<wchar_t[]> findQemuExecutableRegistry(const std::string& system) {
+        HKEY hKey;
+        if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"SOFTWARE\\QEMU", 0, KEY_READ, &hKey) != ERROR_SUCCESS) {
+            return nullptr;
+        }
+
+        DWORD qemu_root_path_size = maxPathLength() * sizeof(wchar_t);
+        auto qemu_root_path = std::make_unique<wchar_t[]>(maxPathLength());
+        if (RegQueryValueExW(
+            hKey,                  // Registry key handle
+            L"Install_Dir",        // Value name
+            nullptr,               // Reserved
+            nullptr,               // Type
+            reinterpret_cast<LPBYTE>(qemu_root_path.get()), // Data
+            &qemu_root_path_size
+        ) != ERROR_SUCCESS) {
+            RegCloseKey(hKey);
+            return nullptr;
+        }
+
+        RegCloseKey(hKey);
+        return getExePathIfExists(qemu_root_path.get(), system);
+    }
+
     // Find the QEMU executable in the system PATH or common installation paths or environment variable QEMU_ROOT
     // argument: system - the system type (e.g., "qemu-system-avr", "qemu-system-arm", "qemu-system-x86_64", etc.)
     std::string findQemuExecutable(const std::string& system) {
@@ -139,7 +163,9 @@ namespace qemu {
         auto path_path = findQemuExecutablePath(system);
         if (path_path) return windowsToStdString(std::move(path_path));
 
-
+        // Check the registry for the QEMU installation path
+        auto registry_path = findQemuExecutableRegistry(system);
+        if (registry_path) return windowsToStdString(std::move(registry_path));
 
         return "";
     }
