@@ -114,6 +114,16 @@ jobs:
       - name: Build
         run: cmake --build --preset gcc-debug --parallel
 
+      - name: Test
+        run: ctest --preset gcc-debug --output-on-failure --verbose
+
+      - name: Publish build artifacts if failed
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts-ubuntu-latest
+          path: build/gcc-debug/
+
   build-and-test-macos-latest:
     runs-on: macos-latest
     if: false
