@@ -105,6 +105,9 @@ jobs:
           echo "Ninja Version:"
           ninja --version
 
+      - name: Show directory contents
+        run: ls -R .
+
       - name: Configure
         run: cmake --preset gcc-debug
 
