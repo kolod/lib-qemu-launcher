@@ -27,6 +27,22 @@ jobs:
           g++ --version
           echo "Ninja Version:"
           ninja --version
+
+      - name: Configure
+        run: cmake --preset gcc-debug
+
+      - name: Build
+        run: cmake --build --preset gcc-debug --parallel
+
+      - name: Test
+        run: ctest --preset gcc-debug --output-on-failure --verbose
+
+      - name: Publish build artifacts if failed
+        if: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts-windows-latest
+          path: build/gcc-debug/
   
   build-and-test-ubuntu-latest:
     runs-on: ubuntu-latest
@@ -44,9 +60,6 @@ jobs:
           g++ --version
           echo "Ninja Version:"
           ninja --version
-
-      - name: Show directory contents
-        run: ls -R .
 
       - name: Configure
         run: cmake --preset gcc-debug
@@ -66,12 +79,17 @@ jobs:
 
   build-and-test-macos-latest:
     runs-on: macos-latest
-    if: false
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup CMake 3.31+
-        uses: jwlawson/actions-setup-cmake@v1
-        with:
-          cmake-version: '>=3.31.0'
+      - name: Print Software Versions
+        run: |
+          echo "CMake Version:"
+          cmake --version
+          echo "GCC Version:"
+          gcc --version
+          echo "G++ Version:"
+          g++ --version
+          echo "Ninja Version:"
+          ninja --version
