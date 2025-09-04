@@ -16,8 +16,8 @@
 namespace qemu {
 
     std::string getExePathIfExists(const std::string& directory, const std::string& system) {
-        // Construct the expected path to the QEMU executable
-        std::string exePath = directory + "/" + system + ".exe";
+        // Construct the expected path to the QEMU executable (no extension on Linux)
+        std::string exePath = directory + "/" + system;
 
         // Check if the file exists
         if (std::filesystem::exists(exePath)) return exePath;
