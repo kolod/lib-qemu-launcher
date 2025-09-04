@@ -10,6 +10,7 @@
 #include <cstdlib>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <limits.h>
 
 // Forward declarations for internal functions we want to test
 namespace qemu {
@@ -287,7 +288,9 @@ TEST_F(QemuLauncherTest, CallbackRegistration) {
 
 // Edge case tests
 TEST(QemuLinuxEdgeCaseTest, EmptySystemName) {
+    std::cout << "Testing empty system name..." << std::endl;
     std::string result = qemu::findQemuExecutable("");
+    std::cout << "Result: " << result << std::endl;
     EXPECT_TRUE(result.empty());
 }
 
@@ -297,7 +300,12 @@ TEST(QemuLinuxEdgeCaseTest, SystemNameWithSpecialCharacters) {
 }
 
 TEST(QemuLinuxEdgeCaseTest, VeryLongSystemName) {
-    std::string longName(1000, 'a');
+    std::cout 
+        << "Testing very long system name..." << std::endl
+        << "  NAME_MAX: " << NAME_MAX << std::endl
+        << "  PATH_MAX: " << PATH_MAX << std::endl;
+
+    std::string longName(NAME_MAX, 'a');
     std::string result = qemu::findQemuExecutable(longName);
     EXPECT_TRUE(result.empty());
 }
