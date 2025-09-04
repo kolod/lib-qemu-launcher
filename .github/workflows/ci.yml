@@ -13,80 +13,20 @@ on:
 jobs:
   build-and-test-windows-latest:
     runs-on: windows-latest
-    if: false
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Update package lists
-        run: sudo apt-get update
-
-      - name: Remove existing CMake
-        if: runner.os == 'Linux'
-        run: sudo apt-get remove -y cmake
-
-      - name: Setup CMake 3.31+
-        uses: jwlawson/actions-setup-cmake@v1
-        with:
-          cmake-version: '>=3.31.0'
-
-      - name: Install GCC (Linux)
-        if: runner.os == 'Linux'
-        run: sudo apt-get install -y build-essential
-
-      - name: Install GCC (macOS)
-        if: runner.os == 'macOS'
-        run: brew install gcc
-
-      - name: Install MinGW-w64 (Windows)
-        if: runner.os == 'Windows'
+      - name: Print Software Versions
         run: |
-          choco install mingw -y --no-progress
-          echo "C:\tools\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          echo "CMake Version:"
+          cmake --version
+          echo "GCC Version:"
+          gcc --version
+          echo "G++ Version:"
           g++ --version
-
-      - name: Install Ninja (Linux)
-        if: runner.os == 'Linux'
-        run: sudo apt-get install -y ninja-build
-
-      - name: Install Ninja (macOS)
-        if: runner.os == 'macOS'
-        run: brew install ninja
-
-      - name: Install Ninja (Windows)
-        if: runner.os == 'Windows'
-        run: choco install ninja
-
-      - name: Show directory contents (Linux/macOS)
-        if: runner.os == 'Linux' || runner.os == 'macOS'
-        run: |
-          ls -R .
-
-      - name: Show directory contents (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          dir /s
-
-      - name: List CMake Presets
-        run: cmake --list-presets
-
-      - name: Configure (Linux/macOS)
-        run: cmake --preset gcc-debug
-
-      - name: Build
-        run: cmake --build --preset gcc-debug --parallel
-
-      - name: Publish build artifacts if failed
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-artifacts-${{ github.run_id }}
-          path: build/gcc-debug/
-
-      - name: Test
-        env:
-          CTEST_OUTPUT_ON_FAILURE: '1'
-        run: ctest --preset gcc-debug -V
+          echo "Ninja Version:"
+          ninja --version
   
   build-and-test-ubuntu-latest:
     runs-on: ubuntu-latest
