@@ -105,6 +105,12 @@ jobs:
           echo "Ninja Version:"
           ninja --version
 
+      - name: Configure
+        run: cmake --preset gcc-debug
+
+      - name: Build
+        run: cmake --build --preset gcc-debug --parallel
+
   build-and-test-macos-latest:
     runs-on: macos-latest
     if: false
