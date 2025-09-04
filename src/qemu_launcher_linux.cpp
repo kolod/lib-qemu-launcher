@@ -58,6 +58,13 @@ namespace qemu {
     // Find the QEMU executable in the system PATH or common installation paths or environment variable QEMU_ROOT
     // argument: system - the system type (e.g., "qemu-system-avr", "qemu-system-arm", "qemu-system-x86_64", etc.)
     std::string findQemuExecutable(const std::string& system) {
+
+        // Check for empty system name
+        if (system.empty()) {
+            std::cerr << "Error: System name is empty." << std::endl;
+            return "";
+        }
+
         // Check the QEMU_ROOT environment variable
         auto qemu_env = findQemuExecutableEnv(system);
         if (!qemu_env.empty()) return qemu_env;
