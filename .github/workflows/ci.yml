@@ -118,7 +118,7 @@ jobs:
         run: ctest --preset gcc-debug --output-on-failure --verbose
 
       - name: Publish build artifacts if failed
-        if: failure()
+        if: true
         uses: actions/upload-artifact@v4
         with:
           name: build-artifacts-ubuntu-latest

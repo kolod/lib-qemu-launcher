@@ -18,7 +18,6 @@
                 "CMAKE_C_COMPILER": "gcc",
                 "CMAKE_CXX_COMPILER": "g++",
                 "CMAKE_EXPORT_COMPILE_COMMANDS": "YES",
-                "BUILD_SHARED_LIBS": "YES",
                 "BUILD_TESTING": "YES",
                 "BUILD_EXAMPLES": "YES"
             }
