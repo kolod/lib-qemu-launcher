@@ -24,8 +24,15 @@ message(STATUS "  CMAKE_PREFIX_PATH: ${CMAKE_PREFIX_PATH}")
 message(STATUS "  CMAKE_BINARY_DIR: ${CMAKE_BINARY_DIR}")
 message(STATUS "  CMAKE_INSTALL_PREFIX: ${CMAKE_INSTALL_PREFIX}")
 
-# Add the src directory
-add_subdirectory(src)
+# Create the qemu_launcher library
+add_library(qemu_launcher STATIC 
+    $<$<PLATFORM_ID:Windows>:src/qemu_launcher_windows.cpp>
+    $<$<PLATFORM_ID:Linux>:src/qemu_launcher_linux.cpp>
+    $<$<PLATFORM_ID:Darwin>:src/qemu_launcher_macos.cpp>
+)
+
+# Set include directories
+target_include_directories(qemu_launcher PUBLIC ${CMAKE_SOURCE_DIR}/include)
 
 # Add the examples directory
 if(BUILD_EXAMPLES)

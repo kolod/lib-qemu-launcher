@@ -38,19 +38,8 @@ public:
     std::vector<std::string> arguments() const;
 
 private:
-    std::string mQemuPath;
-    std::string mBiosFile;
-    std::vector<std::string> mArguments;
-
-    std::function<void(const std::string& msg)> onStdOutCallback;
-    std::function<void(const std::string& msg)> onStdErrCallback;
-    std::function<void(const std::string& msg)> onSerialCallback;
-    std::function<void(int exitCode)> onExitCallback;
-
-    std::iostream* mQemuSerial = nullptr;
-    std::iostream* mQemuStdin  = nullptr;
-    std::iostream* mQemuStdout = nullptr;
-    std::iostream* mQemuStderr = nullptr;
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace qemu

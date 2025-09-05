@@ -39,7 +39,13 @@
         {
             "name": "gcc-debug",
             "displayName": "Test GCC Debug",
-            "configurePreset": "gcc-debug"
+            "configurePreset": "gcc-debug",
+            "execution": {
+                "stopOnFailure": false
+            },
+            "output": {
+                "outputOnFailure": true
+            }
         }
     ],
     "workflowPresets": [

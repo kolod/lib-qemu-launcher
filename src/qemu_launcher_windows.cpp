@@ -9,6 +9,16 @@
 #include <functional>
 #include <memory>
 #include <wchar.h>
+#if defined(__GNUC__)
+  #include <ext/stdio_filebuf.h>      // __gnu_cxx::stdio_filebuf
+#else
+  #include <io.h>                     // _open_osfhandle
+  #include <fcntl.h>                  // _O_RDONLY, etc.
+  #include <fstream>                  // std::filebuf
+#endif
+
+
+#include "qemu/launcher.h"
 
 // Windows-specific implementation will go here
 #define WIN32_LEAN_AND_MEAN
@@ -150,76 +160,255 @@ namespace qemu {
         RegCloseKey(hKey);
         return getExePathIfExists(qemu_root_path.get(), system);
     }
+    struct Launcher::Impl {
 
-    // Find the QEMU executable in the system PATH or common installation paths or environment variable QEMU_ROOT
-    // argument: system - the system type (e.g., "qemu-system-avr", "qemu-system-arm", "qemu-system-x86_64", etc.)
-    std::string findQemuExecutable(const std::string& system) {
+        std::string mQemuPath;
+        std::string mBiosFile;
+        std::vector<std::string> mArguments;
+        std::function<void(const std::string& msg)> mOnStdOut;
+        std::function<void(const std::string& msg)> mOnStdErr;
+        std::function<void(const std::string& msg)> mOnSerial;
+        std::function<void(int exitCode)> mOnExit;
 
-        // Check for empty system name
-        if (system.empty()) {
-            std::cerr << "Error: System name is empty." << std::endl;
-            return "";
-        }
-        
-        // Check the QEMU_ROOT environment variable
-        auto qemu_env = findQemuExecutableEnv(system);
-        if (qemu_env) return windowsToStdString(std::move(qemu_env));
+        std::unique_ptr<std::iostream> mQemuSerial = nullptr;
+        std::unique_ptr<std::istream> mQemuStdout = nullptr;
+        std::unique_ptr<std::istream> mQemuStderr = nullptr;
+        std::unique_ptr<std::ostream> mQemuStdin = nullptr;
 
-        // Search for the QEMU executable in the system PATH
-        auto path_path = findQemuExecutablePath(system);
-        if (path_path) return windowsToStdString(std::move(path_path));
+        bool findQemuExecutable(const std::string& system) {
+            mQemuPath = "";
 
-        // Check the registry for the QEMU installation path
-        auto registry_path = findQemuExecutableRegistry(system);
-        if (registry_path) return windowsToStdString(std::move(registry_path));
+            // Check for empty system name
+            if (system.empty()) {
+                std::cerr << "Error: System name is empty." << std::endl;
+                return false;
+            }
+            
+            // Check the QEMU_ROOT environment variable
+            if (auto path = findQemuExecutableEnv(system)) {
+                mQemuPath = windowsToStdString(std::move(path));
+                std::cout << "Found QEMU executable in QEMU_ROOT: " << mQemuPath << std::endl;
+                return true;
+            }
 
-        return "";
-    }
+            // Search for the QEMU executable in the system PATH
+            if (auto path = findQemuExecutablePath(system)) {
+                mQemuPath = windowsToStdString(std::move(path));
+                std::cout << "Found QEMU executable in PATH: " << mQemuPath << std::endl;
+                return true;
+            }
 
-    // Launch QEMU with the specified arguments
-    bool launchQemu(
-        std::string qemuPath,
-        std::string biosFile,
-        std::vector<std::string> arguments,
-        std::iostream* onStdOut,
-        std::iostream* onStdErr,
-        std::iostream* onSerial,
-        std::function<void(int exitCode)> onExit
-    ) {
+            // Check the registry for the QEMU installation path
+            if (auto path = findQemuExecutableRegistry(system)) {
+                mQemuPath = windowsToStdString(std::move(path));
+                std::cout << "Found QEMU executable in registry: " << mQemuPath << std::endl;
+                return true;
+            }
 
-        // Execute QEMU process
-        STARTUPINFOW si;
-        PROCESS_INFORMATION pi;
-        ZeroMemory(&si, sizeof(si));
-        si.cb = sizeof(si);
-        ZeroMemory(&pi, sizeof(pi));
-
-        // Create the QEMU command line
-        std::string commandLine = qemuPath + " -bios " + biosFile;
-        for (const auto& arg : arguments) commandLine += " " + arg;
-
-        // Create the process
-        auto qemuPathW = stdStringToWindows(qemuPath);
-        auto commandLineW = stdStringToWindows(commandLine);
-
-        if (!CreateProcessW(
-            qemuPathW.get(),    // QEMU executable path
-            commandLineW.get(), // Command line arguments
-            nullptr,            // Process attributes
-            nullptr,            
-            TRUE,
-            0,
-            nullptr,
-            nullptr,
-            &si,
-            &pi
-        )) {
-            std::cerr << "Failed to start QEMU process." << std::endl;
             return false;
         }
 
+        bool start() {
+            // Create named pipe
+            auto pipeName = L"\\\\.\\pipe\\qemu_pipe";
+            HANDLE hSerialPipe = CreateNamedPipeW(
+                pipeName,
+                PIPE_ACCESS_DUPLEX,
+                PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
+                1,
+                1024 * 1024,
+                1024 * 1024,
+                0,
+                nullptr
+            );
 
-        // Implementation
-        return true;
+            if (hSerialPipe == INVALID_HANDLE_VALUE) {
+                std::cerr << "Failed to create named pipe." << std::endl;
+                return false;
+            }
+
+            // Prepare security attributes for inherited handles
+            SECURITY_ATTRIBUTES sa{};
+            sa.nLength = sizeof(sa);
+            sa.bInheritHandle = TRUE;
+            sa.lpSecurityDescriptor = nullptr;
+
+            // Create pipes for child's STDIN, STDOUT, and STDERR
+            HANDLE stdInRd = nullptr, stdInWr = nullptr;
+            CreatePipe(&stdInRd, &stdInWr, &sa, 0);
+
+            HANDLE stdOutRd = nullptr, stdOutWr = nullptr;
+            CreatePipe(&stdOutRd, &stdOutWr, &sa, 0);
+
+            HANDLE stdErrRd = nullptr, stdErrWr = nullptr;
+            CreatePipe(&stdErrRd, &stdErrWr, &sa, 0);
+
+            // Ensure the parent-side handles are not inherited
+            SetHandleInformation(stdInWr, HANDLE_FLAG_INHERIT, 0);
+            SetHandleInformation(stdOutRd, HANDLE_FLAG_INHERIT, 0);
+            SetHandleInformation(stdErrRd, HANDLE_FLAG_INHERIT, 0);
+
+            // Set up STARTUPINFO to redirect child's std handles
+            STARTUPINFOW si;
+            ZeroMemory(&si, sizeof(si));
+            si.cb = sizeof(si);
+            si.dwFlags = STARTF_USESTDHANDLES;
+            si.hStdInput = stdInWr;
+            si.hStdOutput = stdOutRd;
+            si.hStdError = stdErrRd;
+
+            PROCESS_INFORMATION pi;
+            ZeroMemory(&pi, sizeof(pi));
+
+            // Create the QEMU command line
+            std::string commandLine = mQemuPath + " -bios " + mBiosFile;
+            for (const auto& arg : mArguments) commandLine += " " + arg;
+
+            // Create the child process
+            auto qemuPathW = stdStringToWindows(mQemuPath);
+            auto commandLineW = stdStringToWindows(commandLine);
+            if (!CreateProcessW(qemuPathW.get(), commandLineW.get(), nullptr, nullptr, TRUE, 0, nullptr, nullptr, &si, &pi)) {
+                std::cerr << "Failed to start QEMU process." << std::endl;
+                return false;
+            }
+
+            // Close unused ends in the parent
+            CloseHandle(stdInRd);
+            CloseHandle(stdOutWr);
+            CloseHandle(stdErrWr);
+
+            // Wrap pipe
+#if defined(__GNUC__)
+            __gnu_cxx::stdio_filebuf<char> stdInBuf(reinterpret_cast<intptr_t>(stdInWr), std::ios::out);
+            __gnu_cxx::stdio_filebuf<char> stdOutBuf(reinterpret_cast<intptr_t>(stdOutRd), std::ios::in);
+            __gnu_cxx::stdio_filebuf<char> stdErrBuf(reinterpret_cast<intptr_t>(stdErrRd), std::ios::in);
+
+            mQemuStdin.reset(new std::ostream(&stdInBuf));
+            mQemuStdout.reset(new std::istream(&stdOutBuf));
+            mQemuStderr.reset(new std::istream(&stdErrBuf));
+#else
+            // For MSVC, use _open_osfhandle to convert HANDLE to file descriptor
+            if (int stdInFd = _open_osfhandle(reinterpret_cast<intptr_t>(stdInRd), _O_RDONLY) > 0) {
+                mQemuStdin.reset(new std::ostream(&stdInFd));
+            }
+
+            if (int stdOutFd = _open_osfhandle(reinterpret_cast<intptr_t>(stdOutWr), _O_WRONLY) > 0) {
+                mQemuStdout.reset(new std::istream(&stdOutFd));
+            }
+
+            if (int stdErrFd = _open_osfhandle(reinterpret_cast<intptr_t>(stdErrWr), _O_WRONLY) > 0) {
+                mQemuStderr.reset(new std::istream(&stdErrFd));
+            }
+#endif
+
+            // Wait while QEMU connects to serial pipe
+            if (!ConnectNamedPipe(hSerialPipe, nullptr)) {
+                if (GetLastError() == ERROR_PIPE_CONNECTED) {
+                    std::cerr << "QEMU is already connected to the serial pipe." << std::endl;
+                } else {
+                    std::cerr << "Failed to connect to serial pipe." << std::endl;
+                }
+                stop();
+                return false;
+            }
+
+            return true;
+        }
+
+        bool stop() {
+            // Implementation
+            return true;
+        }
+
+        bool terminate() {
+            // Implementation
+            return true;
+        }
+    };
+
+    Launcher::Launcher(const std::string& system) : pImpl(std::make_unique<Impl>()) {
+        pImpl->findQemuExecutable(system);
     }
-}
+
+    Launcher::~Launcher() {
+        if (!pImpl->stop()) {
+            pImpl->terminate();
+        }
+    }
+
+    void Launcher::setQemuPath(const std::string& path) {
+        pImpl->mQemuPath = path;
+    }
+
+    void Launcher::setBios(const std::string& bios) {
+        pImpl->mBiosFile = bios;
+    }
+
+    void Launcher::addArgument(const std::string& arg) {
+        pImpl->mArguments.push_back(arg);
+    }
+
+    void Launcher::onStdOut(std::function<void(const std::string& msg)> callback) {
+        pImpl->mOnStdOut = std::move(callback);
+    }
+
+    void Launcher::onStdErr(std::function<void(const std::string& msg)> callback) {
+        pImpl->mOnStdErr = std::move(callback);
+    }
+
+    void Launcher::onSerial(std::function<void(const std::string& msg)> callback) {
+        pImpl->mOnSerial = std::move(callback);
+    }
+
+    void Launcher::onExit(std::function<void(const int exitCode)> callback) {
+        pImpl->mOnExit = std::move(callback);
+    }
+
+    void Launcher::writeStdIn(const std::string& msg) {
+        if (pImpl->mQemuStdin != nullptr) {
+            *pImpl->mQemuStdin << msg;
+        }
+    }
+
+    bool Launcher::start() {
+        if (!pImpl->mQemuPath.empty()) {
+            std::cerr << "Error: QEMU executable path is not set." << std::endl;
+            return false;
+        }
+
+        if (!pImpl->mBiosFile.empty()) {
+            std::cerr << "Error: BIOS file is not set." << std::endl;
+            return false;
+        }
+
+        std::cout << "Starting QEMU with the following parameters:" << std::endl;
+        std::cout << "QEMU Path: " << pImpl->mQemuPath << std::endl;
+        std::cout << "BIOS File: " << pImpl->mBiosFile << std::endl;
+        std::cout << "Arguments: ";
+        for (const auto& arg : pImpl->mArguments) std::cout << arg << " ";
+        std::cout << std::endl;
+
+        return pImpl->start();
+    }
+
+    bool Launcher::stop() {
+        return pImpl->stop();
+    }
+
+    bool Launcher::terminate() {
+        return pImpl->terminate();
+    }
+
+    std::string Launcher::qemuPath() const {
+        return pImpl->mQemuPath;
+    }
+
+    std::string Launcher::bios() const {
+        return pImpl->mBiosFile;
+    }
+
+    std::vector<std::string> Launcher::arguments() const {
+        return pImpl->mArguments;
+    }
+
+} // namespace qemu

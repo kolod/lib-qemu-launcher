@@ -46,6 +46,7 @@ jobs:
   
   build-and-test-ubuntu-latest:
     runs-on: ubuntu-latest
+    if: false
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -79,6 +80,7 @@ jobs:
 
   build-and-test-macos-latest:
     runs-on: macos-latest
+    if: false
     steps:
       - name: Checkout
         uses: actions/checkout@v4

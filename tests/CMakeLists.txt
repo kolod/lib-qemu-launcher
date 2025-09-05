@@ -17,26 +17,15 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Platform-specific source files
-if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
-    add_executable(qemu_launcher_tests test_qemu_launcher_windows.cpp)
-elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin")
-    add_executable(qemu_launcher_tests test_qemu_launcher_macos.cpp)
-else()
-    add_executable(qemu_launcher_tests test_qemu_launcher_linux.cpp)
-endif()
+add_executable(qemu_launcher_tests 
+    $<$<PLATFORM_ID:Windows>:test_qemu_launcher_windows.cpp>
+    $<$<PLATFORM_ID:Darwin>:test_qemu_launcher_macos.cpp>
+    $<$<PLATFORM_ID:Linux>:test_qemu_launcher_linux.cpp>
+)
 
 # Link with the qemu_launcher library
 target_link_libraries(qemu_launcher_tests PRIVATE qemu_launcher)
 target_link_libraries(qemu_launcher_tests PRIVATE gtest_main)
 
-# # Enable Google Test
-# if(WIN32)
-#     # Copy runtime DLLs next to the test exe for discovery to work with MinGW
-#     add_custom_command(TARGET qemu_launcher_tests POST_BUILD
-#     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-#         $<TARGET_RUNTIME_DLLS:qemu_launcher_tests>
-#         $<TARGET_FILE_DIR:qemu_launcher_tests>
-#     COMMAND_EXPAND_LISTS)
-# endif()
-
+# Discover tests
 gtest_discover_tests(qemu_launcher_tests)
