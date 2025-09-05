@@ -46,7 +46,6 @@ jobs:
   
   build-and-test-ubuntu-latest:
     runs-on: ubuntu-latest
-    if: false
     steps:
       - name: Checkout
         uses: actions/checkout@v4

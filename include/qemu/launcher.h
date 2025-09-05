@@ -10,6 +10,7 @@
 #include <vector>
 #include <iostream>
 #include <filesystem>
+#include <memory>
 
 namespace qemu {
 
