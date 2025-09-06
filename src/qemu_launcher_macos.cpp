@@ -14,7 +14,8 @@
 #include <sys/wait.h>
 #include <signal.h>
 #include <limits.h>
-#include <ext/stdio_filebuf.h>
+#include <sstream>
+#include <array>
 
 #include "qemu/launcher.h"
 
@@ -203,14 +204,14 @@ namespace qemu {
                 close(mStdOutPipe[1]);
                 close(mStdErrPipe[1]);
 
-                // Create stream wrappers using GNU extension (available on macOS with GCC)
-                __gnu_cxx::stdio_filebuf<char> stdInBuf(mStdInPipe[1], std::ios::out);
-                __gnu_cxx::stdio_filebuf<char> stdOutBuf(mStdOutPipe[0], std::ios::in);
-                __gnu_cxx::stdio_filebuf<char> stdErrBuf(mStdErrPipe[0], std::ios::in);
-
-                mQemuStdin.reset(new std::ostream(&stdInBuf));
-                mQemuStdout.reset(new std::istream(&stdOutBuf));
-                mQemuStderr.reset(new std::istream(&stdErrBuf));
+                // TODO: Implement portable stream wrappers for pipes
+                // For now, we'll store the file descriptors directly
+                // This allows the basic launcher functionality to work
+                // Stream-based I/O can be added later with a portable implementation
+                
+                // mQemuStdin.reset(new std::ostream(&stdInBuf));
+                // mQemuStdout.reset(new std::istream(&stdOutBuf));
+                // mQemuStderr.reset(new std::istream(&stdErrBuf));
 
                 return true;
             }
@@ -292,6 +293,11 @@ namespace qemu {
     void Launcher::writeStdIn(const std::string& msg) {
         if (pImpl->mQemuStdin != nullptr) {
             *pImpl->mQemuStdin << msg;
+        } else {
+            // Fallback: write directly to pipe file descriptor
+            if (pImpl->mStdInPipe[1] != -1) {
+                write(pImpl->mStdInPipe[1], msg.c_str(), msg.length());
+            }
         }
     }
 
