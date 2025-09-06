@@ -10,6 +10,11 @@ option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 option(BUILD_TESTING "Build testing" OFF)
 option(BUILD_EXAMPLES "Build examples" OFF)
 
+# Set C++17 globally
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS ON)
+
 message(STATUS "Building with options:")
 message(STATUS "  BUILD_SHARED_LIBS: ${BUILD_SHARED_LIBS}")
 message(STATUS "  BUILD_TESTING: ${BUILD_TESTING}")
